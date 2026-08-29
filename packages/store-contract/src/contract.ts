@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 export interface StoreContractOptions {
   /** Build a fresh store. Called once per suite. */
-  create: () => Promise<IdempotencyStore<unknown>> | IdempotencyStore<unknown>;
+  create: () => Promise<IdempotencyStore> | IdempotencyStore;
   /** Tear the store down. Defaults to `store.close?.()`. */
-  destroy?: (store: IdempotencyStore<unknown>) => Promise<void> | void;
+  destroy?: (store: IdempotencyStore) => Promise<void> | void;
   /**
    * Slack allowed when comparing timestamps the store produced with the test's
    * own clock, in milliseconds. Raise it for stores that use a server clock.
@@ -27,7 +27,7 @@ const ttl = { keyTtlMs: 60_000, lockTtlMs: 5_000 };
  */
 export function describeStoreContract(name: string, options: StoreContractOptions): void {
   describe(`store contract: ${name}`, () => {
-    let store: IdempotencyStore<unknown>;
+    let store: IdempotencyStore;
     const tolerance = options.clockToleranceMs ?? 50;
     const key = () => `contract:${randomUUID()}`;
 
