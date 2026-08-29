@@ -1,0 +1,72 @@
+{
+  "name": "@mohadjillani/idempotency-kit",
+  "version": "0.0.0",
+  "description": "Idempotency keys for Node.js HTTP services: an explicit request state machine, atomic acquire, response replay, and an Express binding. Zero runtime dependencies.",
+  "keywords": [
+    "idempotency",
+    "idempotency-key",
+    "retry",
+    "express",
+    "middleware",
+    "payments",
+    "typescript"
+  ],
+  "author": "Mohad Jillani <mohad.jillani@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohadjillani/idempotency-kit.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/mohadjillani/idempotency-kit#readme",
+  "bugs": "https://github.com/mohadjillani/idempotency-kit/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./express": {
+      "import": {
+        "types": "./dist/express.d.ts",
+        "default": "./dist/express.js"
+      },
+      "require": {
+        "types": "./dist/express.d.cts",
+        "default": "./dist/express.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "peerDependencies": {
+    "express": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  }
+}

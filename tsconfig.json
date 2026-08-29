@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@mohadjillani/idempotency-kit": ["packages/core/src/index.ts"],
+      "@mohadjillani/idempotency-kit/express": ["packages/core/src/express.ts"],
+      "@mohadjillani/idempotency-kit-redis": ["packages/store-redis/src/index.ts"],
+      "@mohadjillani/idempotency-kit-mongodb": ["packages/store-mongodb/src/index.ts"],
+      "idempotency-kit-store-contract": ["packages/store-contract/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "packages/*/tsup.config.ts",
+    "examples/*/src",
+    "examples/*/test",
+    "bench",
+    "scripts",
+    "vitest.config.ts",
+    "eslint.config.mjs"
+  ]
+}

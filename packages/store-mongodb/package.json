@@ -1,0 +1,58 @@
+{
+  "name": "@mohadjillani/idempotency-kit-mongodb",
+  "version": "0.0.0",
+  "description": "MongoDB store for @mohadjillani/idempotency-kit: findOneAndUpdate upsert on the _id index with a TTL index for expiry.",
+  "keywords": [
+    "idempotency",
+    "idempotency-key",
+    "mongodb"
+  ],
+  "author": "Mohad Jillani <mohad.jillani@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohadjillani/idempotency-kit.git",
+    "directory": "packages/store-mongodb"
+  },
+  "homepage": "https://github.com/mohadjillani/idempotency-kit#readme",
+  "bugs": "https://github.com/mohadjillani/idempotency-kit/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "peerDependencies": {
+    "@mohadjillani/idempotency-kit": "0.x",
+    "mongodb": "^6.0.0 || ^7.0.0"
+  },
+  "devDependencies": {
+    "mongodb": "^7.6.0",
+    "mongodb-memory-server": "^11.2.0"
+  }
+}

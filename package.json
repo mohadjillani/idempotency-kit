@@ -1,0 +1,49 @@
+{
+  "name": "idempotency-kit-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Idempotency keys for Node.js HTTP services: state machine core, response replay, Express binding, Redis and MongoDB stores.",
+  "author": "Mohad Jillani <mohad.jillani@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohadjillani/idempotency-kit.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/store-contract",
+    "packages/store-redis",
+    "packages/store-mongodb",
+    "examples/express-payments"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/core && npm run build -w packages/store-redis && npm run build -w packages/store-mongodb",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.1",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^9.39.5",
+    "express": "^5.2.1",
+    "fast-check": "^4.9.0",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^3.2.7"
+  }
+}
