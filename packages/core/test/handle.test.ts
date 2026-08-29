@@ -1,0 +1,110 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  createIdempotency,
+  IdempotencyConfigError,
+  MemoryStore,
+} from '@mohadjillani/idempotency-kit';
+
+function clock(start = 1_000) {
+  let t = start;
+  return { now: () => t, tick: (ms: number) => (t += ms) };
+}
+
+function setup(over: Partial<Parameters<typeof createIdempotency<string>>[0]> = {}) {
+  const c = clock();
+  const store = new MemoryStore<string>({ now: c.now, sweepIntervalMs: 0 });
+  const idem = createIdempotency<string>({
+    store,
+    ttlMs: 10_000,
+    lockTtlMs: 1_000,
+    now: c.now,
+    ...over,
+  });
+  return { c, store, idem };
+}
+
+describe('createIdempotency', () => {
+  it('applies defaults', () => {
+    const { options } = createIdempotency({ store: new MemoryStore({ sweepIntervalMs: 0 }) });
+    expect(options.ttlMs).toBe(24 * 60 * 60 * 1000);
+    expect(options.lockTtlMs).toBe(30_000);
+    expect(options.onConflict).toBe('reject');
+  });
+
+  it('rejects a lock ttl that is not shorter than the key ttl', () => {
+    const store = new MemoryStore({ sweepIntervalMs: 0 });
+    expect(() => createIdempotency({ store, ttlMs: 1_000, lockTtlMs: 1_000 })).toThrow(
+      IdempotencyConfigError,
+    );
+    expect(() => createIdempotency({ store, ttlMs: 0 })).toThrow(/ttlMs/);
+    expect(() => createIdempotency({ store, lockTtlMs: -1 })).toThrow(/lockTtlMs/);
+  });
+});
+
+describe('handle', () => {
+  it('executes a fresh key and stores the response', async () => {
+    const { idem, store } = setup();
+    const execute = vi.fn(() => Promise.resolve('charged'));
+    const out = await idem.handle('k', 'fp', execute);
+    expect(out).toEqual({ outcome: 'executed', response: 'charged', stored: true });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect((await store.get('k'))?.status).toBe('completed');
+  });
+
+  it('replays a completed key without executing', async () => {
+    const { idem } = setup();
+    await idem.handle('k', 'fp', () => 'charged');
+    const execute = vi.fn(() => 'again');
+    const out = await idem.handle('k', 'fp', execute);
+    expect(out).toMatchObject({ outcome: 'replayed', response: 'charged' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('reports a live in-flight key with a retry hint', async () => {
+    const { idem, c } = setup();
+    let finish!: (v: string) => void;
+    const first = idem.handle('k', 'fp', () => new Promise<string>((r) => (finish = r)));
+    c.tick(250);
+    const second = await idem.handle('k', 'fp', () => 'never');
+    expect(second).toMatchObject({ outcome: 'in-flight', retryAfterMs: 750 });
+    finish('done');
+    expect(await first).toMatchObject({ outcome: 'executed', response: 'done' });
+  });
+
+  it('reports a fingerprint mismatch for completed and in-flight keys', async () => {
+    const { idem } = setup();
+    let finish!: (v: string) => void;
+    const first = idem.handle('k', 'fp-a', () => new Promise<string>((r) => (finish = r)));
+    expect(await idem.handle('k', 'fp-b', () => 'x')).toMatchObject({ outcome: 'mismatch' });
+    finish('done');
+    await first;
+    const out = await idem.handle('k', 'fp-b', () => 'x');
+    expect(out).toMatchObject({ outcome: 'mismatch', record: { status: 'completed' } });
+  });
+
+  it('re-executes once the key ttl has passed', async () => {
+    const { idem, c } = setup();
+    await idem.handle('k', 'fp', () => 'one');
+    c.tick(10_000);
+    expect(await idem.handle('k', 'fp', () => 'two')).toMatchObject({
+      outcome: 'executed',
+      response: 'two',
+    });
+  });
+
+  it('takes over an abandoned in-flight key after the lock ttl', async () => {
+    const { idem, c } = setup();
+    void idem.handle('k', 'fp', () => new Promise<string>(() => undefined));
+    await Promise.resolve();
+    c.tick(1_000);
+    expect(await idem.handle('k', 'fp', () => 'second')).toMatchObject({
+      outcome: 'executed',
+      response: 'second',
+    });
+  });
+
+  it('rejects an empty key', async () => {
+    const { idem } = setup();
+    await expect(idem.handle('', 'fp', () => 'x')).rejects.toThrow(TypeError);
+  });
+});

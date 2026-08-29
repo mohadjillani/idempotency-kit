@@ -11,3 +11,9 @@ export type { AcquireInput, KeyState, Transition } from './state.js';
 export { IdempotencyConfigError, RequestAbortedError } from './errors.js';
 export { MemoryStore, type MemoryStoreOptions } from './stores/memory.js';
 export { canonicalize, fingerprint } from './fingerprint.js';
+export {
+  createIdempotency,
+  type Idempotency,
+  type IdempotencyOptions,
+  type Outcome,
+} from './idempotency.js';
