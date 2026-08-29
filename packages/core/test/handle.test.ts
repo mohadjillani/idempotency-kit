@@ -108,3 +108,57 @@ describe('handle', () => {
     await expect(idem.handle('', 'fp', () => 'x')).rejects.toThrow(TypeError);
   });
 });
+
+describe('handle with onConflict: wait', () => {
+  it('waits for the owner and replays its response', async () => {
+    const { idem } = setup({ onConflict: 'wait', wait: { pollIntervalMs: 5 } });
+    let finish!: (v: string) => void;
+    const first = idem.handle('k', 'fp', () => new Promise<string>((r) => (finish = r)));
+    await Promise.resolve();
+    const execute = vi.fn(() => 'never');
+    const second = idem.handle('k', 'fp', execute);
+    setTimeout(() => {
+      finish('done');
+    }, 20);
+    expect(await second).toMatchObject({ outcome: 'replayed', response: 'done' });
+    expect(await first).toMatchObject({ outcome: 'executed' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('gives up after the wait timeout and reports in-flight', async () => {
+    const { idem } = setup({ onConflict: 'wait', wait: { timeoutMs: 30, pollIntervalMs: 5 } });
+    void idem.handle('k', 'fp', () => new Promise<string>(() => undefined));
+    await Promise.resolve();
+    const acquire = vi.spyOn(idem.options.store, 'acquire');
+    const out = await idem.handle('k', 'fp', () => 'never');
+    expect(out.outcome).toBe('in-flight');
+    expect(acquire.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('takes over and executes when the owner abandons the key mid-wait', async () => {
+    const { idem, c } = setup({ onConflict: 'wait', wait: { timeoutMs: 500, pollIntervalMs: 5 } });
+    void idem.handle('k', 'fp', () => new Promise<string>(() => undefined));
+    await Promise.resolve();
+    setTimeout(() => c.tick(1_000), 10);
+    expect(await idem.handle('k', 'fp', () => 'second')).toMatchObject({
+      outcome: 'executed',
+      response: 'second',
+    });
+  });
+
+  it('does not wait on a fingerprint mismatch', async () => {
+    const { idem } = setup({ onConflict: 'wait', wait: { timeoutMs: 5_000 } });
+    void idem.handle('k', 'fp-a', () => new Promise<string>(() => undefined));
+    await Promise.resolve();
+    const started = Date.now();
+    expect(await idem.handle('k', 'fp-b', () => 'x')).toMatchObject({ outcome: 'mismatch' });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('validates the wait bounds', () => {
+    const store = new MemoryStore({ sweepIntervalMs: 0 });
+    expect(() => createIdempotency({ store, wait: { pollIntervalMs: 0 } })).toThrow(
+      IdempotencyConfigError,
+    );
+  });
+});
