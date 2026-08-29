@@ -24,9 +24,29 @@ export interface IdempotencyOptions<T> {
     /** How often to re-check the key while waiting. Default 25. */
     pollIntervalMs?: number;
   };
+  /**
+   * Decide whether a response the handler produced is worth replaying. When it
+   * returns false the key is released so the next request re-executes. The
+   * Express binding defaults this to "status below 500"; the core keeps every
+   * response.
+   */
+  shouldStore?: (response: T) => boolean;
+  /**
+   * What to do when the store itself fails (connection refused, timeout).
+   * `false` (default) reports `store-unavailable` and the handler does not
+   * run: the library exists to prevent double effects, and running without
+   * protection would break that silently. `true` runs the handler unprotected
+   * and reports `stored: false`; use it for endpoints where availability
+   * matters more than exactly-once.
+   */
+  failOpen?: boolean;
+  /** Called with every store error, whichever way `failOpen` is set. */
+  onStoreError?: (error: unknown, context: { key: string; operation: StoreOperation }) => void;
   /** Clock used for retry hints; TTLs themselves are the store's business. Defaults to `Date.now`. */
   now?: () => number;
 }
+
+export type StoreOperation = 'acquire' | 'complete' | 'release';
 
 export type Outcome<T> =
   /** The handler ran. `stored` is false when the response was not kept. */
@@ -36,7 +56,9 @@ export type Outcome<T> =
   /** Another request holds the key. `retryAfterMs` is until its lock expires. */
   | { outcome: 'in-flight'; retryAfterMs: number; record: InFlightRecord }
   /** The key exists but was first used for a different request. */
-  | { outcome: 'mismatch'; record: InFlightRecord | CompletedRecord<T> };
+  | { outcome: 'mismatch'; record: InFlightRecord | CompletedRecord<T> }
+  /** The store failed and `failOpen` is off, so nothing ran. */
+  | { outcome: 'store-unavailable'; error: unknown };
 
 export interface Idempotency<T> {
   /**
@@ -53,6 +75,9 @@ export interface ResolvedOptions<T> {
   lockTtlMs: number;
   onConflict: 'reject' | 'wait';
   wait: { timeoutMs: number; pollIntervalMs: number };
+  shouldStore: (response: T) => boolean;
+  failOpen: boolean;
+  onStoreError: (error: unknown, context: { key: string; operation: StoreOperation }) => void;
   now: () => number;
 }
 
@@ -70,6 +95,9 @@ export function createIdempotency<T>(options: IdempotencyOptions<T>): Idempotenc
       timeoutMs: options.wait?.timeoutMs ?? 5_000,
       pollIntervalMs: options.wait?.pollIntervalMs ?? 25,
     },
+    shouldStore: options.shouldStore ?? (() => true),
+    failOpen: options.failOpen ?? false,
+    onStoreError: options.onStoreError ?? (() => undefined),
     now: options.now ?? Date.now,
   };
 
@@ -115,7 +143,14 @@ export function createIdempotency<T>(options: IdempotencyOptions<T>): Idempotenc
       throw new TypeError('idempotency key must be a non-empty string');
     }
 
-    let acquired = await resolved.store.acquire(key, fingerprint, ttl);
+    let acquired: AcquireResult<T>;
+    try {
+      acquired = await resolved.store.acquire(key, fingerprint, ttl);
+    } catch (error) {
+      resolved.onStoreError(error, { key, operation: 'acquire' });
+      if (!resolved.failOpen) return { outcome: 'store-unavailable', error };
+      return { outcome: 'executed', response: await execute(), stored: false };
+    }
 
     if (
       acquired.status === 'in-flight' &&
@@ -139,9 +174,39 @@ export function createIdempotency<T>(options: IdempotencyOptions<T>): Idempotenc
       };
     }
 
-    const response = await execute();
-    const stored = await resolved.store.complete(key, acquired.record.token, response);
+    const { token } = acquired.record;
+    let response: T;
+    try {
+      response = await execute();
+    } catch (error) {
+      // The handler failed: forget the key so the client's retry re-executes
+      // instead of replaying a failure for the rest of the TTL.
+      await release(key, token);
+      throw error;
+    }
+
+    if (!resolved.shouldStore(response)) {
+      await release(key, token);
+      return { outcome: 'executed', response, stored: false };
+    }
+
+    let stored = false;
+    try {
+      stored = await resolved.store.complete(key, token, response);
+    } catch (error) {
+      // The effect already happened; the most we can do is report it. The
+      // in-flight record expires with its lock, after which a retry re-executes.
+      resolved.onStoreError(error, { key, operation: 'complete' });
+    }
     return { outcome: 'executed', response, stored };
+  }
+
+  async function release(key: string, token: string): Promise<void> {
+    try {
+      await resolved.store.release(key, token);
+    } catch (error) {
+      resolved.onStoreError(error, { key, operation: 'release' });
+    }
   }
 
   return { handle, options: resolved };

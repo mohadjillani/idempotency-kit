@@ -17,4 +17,5 @@ export {
   type IdempotencyOptions,
   type Outcome,
   type ResolvedOptions,
+  type StoreOperation,
 } from './idempotency.js';

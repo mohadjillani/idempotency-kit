@@ -162,3 +162,100 @@ describe('handle with onConflict: wait', () => {
     );
   });
 });
+
+describe('handle failure modes', () => {
+  it('releases the key when the handler throws so a retry re-executes', async () => {
+    const { idem, store } = setup();
+    await expect(
+      idem.handle('k', 'fp', () => {
+        throw new Error('gateway down');
+      }),
+    ).rejects.toThrow('gateway down');
+    expect(await store.get('k')).toBeUndefined();
+    expect(await idem.handle('k', 'fp', () => 'ok')).toMatchObject({
+      outcome: 'executed',
+      response: 'ok',
+    });
+  });
+
+  it('releases instead of storing when shouldStore says no', async () => {
+    const { idem, store } = setup({ shouldStore: (r) => r !== 'transient' });
+    expect(await idem.handle('k', 'fp', () => 'transient')).toEqual({
+      outcome: 'executed',
+      response: 'transient',
+      stored: false,
+    });
+    expect(await store.get('k')).toBeUndefined();
+    expect(await idem.handle('k', 'fp', () => 'final')).toMatchObject({ stored: true });
+    expect(await idem.handle('k', 'fp', () => 'x')).toMatchObject({ outcome: 'replayed' });
+  });
+
+  it('fails closed when acquire throws', async () => {
+    const onStoreError = vi.fn();
+    const { idem, store } = setup({ onStoreError });
+    const boom = new Error('ECONNREFUSED');
+    vi.spyOn(store, 'acquire').mockRejectedValueOnce(boom);
+    const execute = vi.fn(() => 'x');
+    expect(await idem.handle('k', 'fp', execute)).toEqual({
+      outcome: 'store-unavailable',
+      error: boom,
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(onStoreError).toHaveBeenCalledWith(boom, { key: 'k', operation: 'acquire' });
+  });
+
+  it('runs unprotected when failOpen is set', async () => {
+    const onStoreError = vi.fn();
+    const { idem, store } = setup({ failOpen: true, onStoreError });
+    vi.spyOn(store, 'acquire').mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    expect(await idem.handle('k', 'fp', () => 'x')).toEqual({
+      outcome: 'executed',
+      response: 'x',
+      stored: false,
+    });
+    expect(onStoreError).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports but does not fail when complete throws after the handler ran', async () => {
+    const onStoreError = vi.fn();
+    const { idem, store } = setup({ onStoreError });
+    vi.spyOn(store, 'complete').mockRejectedValueOnce(new Error('timeout'));
+    expect(await idem.handle('k', 'fp', () => 'x')).toEqual({
+      outcome: 'executed',
+      response: 'x',
+      stored: false,
+    });
+    expect(onStoreError).toHaveBeenCalledWith(expect.any(Error), {
+      key: 'k',
+      operation: 'complete',
+    });
+  });
+
+  it('still rethrows the handler error when release itself fails', async () => {
+    const onStoreError = vi.fn();
+    const { idem, store } = setup({ onStoreError });
+    vi.spyOn(store, 'release').mockRejectedValueOnce(new Error('timeout'));
+    await expect(
+      idem.handle('k', 'fp', () => Promise.reject(new Error('handler'))),
+    ).rejects.toThrow('handler');
+    expect(onStoreError).toHaveBeenCalledWith(expect.any(Error), {
+      key: 'k',
+      operation: 'release',
+    });
+  });
+
+  it('reports stored: false when a stale owner completes after a takeover', async () => {
+    const { idem, c } = setup();
+    let finish!: (v: string) => void;
+    const first = idem.handle('k', 'fp', () => new Promise<string>((r) => (finish = r)));
+    await Promise.resolve();
+    c.tick(1_000);
+    expect(await idem.handle('k', 'fp', () => 'second')).toMatchObject({ stored: true });
+    finish('first');
+    expect(await first).toEqual({ outcome: 'executed', response: 'first', stored: false });
+    expect(await idem.handle('k', 'fp', () => 'x')).toMatchObject({
+      outcome: 'replayed',
+      response: 'second',
+    });
+  });
+});
