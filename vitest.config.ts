@@ -54,7 +54,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['packages/store-contract/**'],
+      // store-contract is test code; types.ts has no runtime statements.
+      exclude: ['packages/store-contract/**', 'packages/core/src/types.ts'],
+      thresholds: { lines: 90, functions: 95, branches: 80, statements: 90 },
     },
   },
 });
