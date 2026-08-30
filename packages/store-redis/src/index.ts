@@ -109,7 +109,11 @@ export class RedisStore<T = unknown> implements IdempotencyStore<T> {
 
   private parse(key: string, flat: string[]): IdempotencyRecord<T> {
     const f: Record<string, string> = {};
-    for (let i = 0; i + 1 < flat.length; i += 2) f[flat[i] as string] = flat[i + 1] as string;
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      const name = flat[i];
+      const value = flat[i + 1];
+      if (name !== undefined && value !== undefined) f[name] = value;
+    }
     const base = {
       key,
       fingerprint: f.fingerprint ?? '',
