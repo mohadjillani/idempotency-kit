@@ -1,0 +1,22 @@
+# Backends for the store contract and race suites and for the example app.
+#   docker compose up -d
+#   REDIS_URL=redis://127.0.0.1:6379 MONGODB_URL=mongodb://127.0.0.1:27017 npm test
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  mongo:
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      interval: 5s
+      timeout: 3s
+      retries: 10
