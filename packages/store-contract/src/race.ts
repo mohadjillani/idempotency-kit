@@ -31,7 +31,12 @@ export async function runRace(
   concurrency: number,
 ): Promise<RaceResult> {
   let executions = 0;
+  let arrived = 0;
   const app = express();
+  app.use((_req, _res, next) => {
+    arrived += 1;
+    next();
+  });
   app.use(express.json());
   app.use(
     idempotency({
@@ -42,10 +47,18 @@ export async function runRace(
       wait: { timeoutMs: 10_000, pollIntervalMs: 10 },
     }),
   );
+  // The handler responds only after every request has reached the server
+  // (plus a beat for the rest to pass through the middleware), so the result
+  // does not depend on how quickly the client opens N connections.
+  const allArrived = async () => {
+    const deadline = Date.now() + 5_000;
+    while (arrived < concurrency && Date.now() < deadline) await sleep(5);
+    await sleep(100);
+  };
   app.post('/charges', (req, res) => {
     executions += 1;
     const n = executions;
-    void sleep(100).then(() => {
+    void allArrived().then(() => {
       res.status(201).json({ id: `ch_${String(n)}`, ...(req.body as object) });
     });
   });
