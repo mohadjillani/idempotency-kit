@@ -24,7 +24,10 @@ interface Row {
 async function charge(scenario: string, key: string, body: object): Promise<Row> {
   const res = await fetch(`${base}/charges`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'idempotency-key': key },
+    headers:
+      key === ''
+        ? { 'content-type': 'application/json' }
+        : { 'content-type': 'application/json', 'idempotency-key': key },
     body: JSON.stringify(body),
   });
   const json = (await res.json()) as Record<string, unknown>;
