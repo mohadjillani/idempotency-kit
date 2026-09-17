@@ -176,11 +176,17 @@ npm test                                   # unit, property, contract, race on m
 docker compose up -d                       # or point at your own
 REDIS_URL=redis://127.0.0.1:6379 MONGODB_URL=mongodb://127.0.0.1:27017 npm test
 npm run demo                               # builds, then runs the scripted double submit in examples/express-payments
+npm run demo:completions                   # the same, for a streaming completion endpoint
 ```
 
 Beyond the race: fast-check drives random `acquire`/`complete`/`release` sequences with a moving clock through the state machine and checks that a key is only claimed when absent, expired or holding an expired lock, that a completed key always replays the same response, that only the current token can complete or release, and that no transition outside the state table ever occurs. The store contract suite runs against memory, Redis and MongoDB so the backends cannot drift from each other. CI runs everything on Node 20, 22 and 24, with `redis:7` and `mongo:7` service containers for the integration job.
 
 Not tested, and stated as limits below: clock skew between application processes, and Redis Cluster.
+
+## Examples
+
+- [`examples/express-payments`](examples/express-payments) — a charge that must not happen twice, with the decline/gateway-failure split that decides which responses are kept.
+- [`examples/express-completions`](examples/express-completions) — a streaming completion endpoint. The sharper case: the provider samples, so an unprotected retry is billed a second time **and** returns a different answer. It also shows what capturing a stream does and does not give you — identical bytes, delivered in one write rather than re-streamed.
 
 ## Overhead
 
@@ -211,7 +217,7 @@ Key entropy, scoping and what the store holds are covered in [`SECURITY.md`](SEC
 
 - **Clocks.** TTL arithmetic uses each application process's clock (Redis expiry itself uses the server's). Processes with skewed clocks disagree about when a lock is abandoned; keep NTP running and `lockTtlMs` generous.
 - **Lock expiry under a slow handler still means a second execution.** The fencing token decides whose response is kept, not whether the second run happens. Set `lockTtlMs` above the slowest legitimate handler.
-- **Responses are buffered whole.** No streaming replay, and large bodies cost memory in the store.
+- **Responses are buffered whole.** No streaming replay, and large bodies cost memory in the store. A captured stream is replayed as a single write — identical bytes, but a client rendering tokens as they arrive sees the replay arrive at once; [`examples/express-completions`](examples/express-completions) shows the shape of that.
 - **Redis: single node or Sentinel.** Every script touches one key so Cluster should work, but it is not tested.
 - **MongoDB's TTL monitor runs about once a minute**, so expired documents linger briefly; reads apply expiry themselves, so behaviour is unaffected.
 - **The memory store is per process.** Two replicas with memory stores protect nothing across each other.
@@ -227,6 +233,7 @@ Key entropy, scoping and what the store holds are covered in [`SECURITY.md`](SEC
 
 - [`webhook-receiver-kit`](https://github.com/mohadjillani/webhook-receiver-kit) and [`stripe-flows-reference`](https://github.com/mohadjillani/stripe-flows-reference) consume this package for at-least-once webhook delivery and payment retries.
 - [`socketio-scale-template`](https://github.com/mohadjillani/socketio-scale-template) applies the same at-least-once reasoning to socket events.
+- [`llm-service-starter`](https://github.com/mohadjillani/llm-service-starter) is the service shape the completions example is a slice of, and [`rate-limiting-patterns`](https://github.com/mohadjillani/rate-limiting-patterns) covers the other half of retrying against a provider: staying inside its quota while you do.
 
 ## License
 
