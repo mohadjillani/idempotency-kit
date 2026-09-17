@@ -1,0 +1,17 @@
+{
+  "name": "express-completions-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable Express example: a streaming completion endpoint protected by idempotency keys, where a retry replays the stream instead of paying for a second one.",
+  "author": "Mohad Jillani <mohad.jillani@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "demo": "tsx src/demo.ts"
+  },
+  "dependencies": {
+    "@mohadjillani/idempotency-kit": "*",
+    "express": "^5.2.1"
+  }
+}
