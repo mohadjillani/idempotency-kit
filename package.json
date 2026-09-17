@@ -30,6 +30,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "demo": "npm run build && npm run demo -w examples/express-payments",
+    "demo:completions": "npm run build && npm run demo -w examples/express-completions",
     "check:exports": "node scripts/check-exports.mjs",
     "release": "npm run build && changeset publish",
     "changeset": "changeset",
