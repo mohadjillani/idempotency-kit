@@ -56,6 +56,14 @@ export default defineConfig({
           include: ['test/**/*.test.ts'],
         },
       },
+      {
+        extends: true,
+        test: {
+          name: 'completions-example',
+          root: 'examples/express-completions',
+          include: ['test/**/*.test.ts'],
+        },
+      },
     ],
     coverage: {
       provider: 'v8',

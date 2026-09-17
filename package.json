@@ -18,7 +18,8 @@
     "packages/store-contract",
     "packages/store-redis",
     "packages/store-mongodb",
-    "examples/express-payments"
+    "examples/express-payments",
+    "examples/express-completions"
   ],
   "scripts": {
     "build": "npm run build -w packages/core && npm run build -w packages/store-redis && npm run build -w packages/store-mongodb",
