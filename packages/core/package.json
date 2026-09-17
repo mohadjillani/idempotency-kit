@@ -1,6 +1,6 @@
 {
   "name": "@mohadjillani/idempotency-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Idempotency keys for Node.js HTTP services: an explicit request state machine, atomic acquire, response replay, and an Express binding. Zero runtime dependencies.",
   "keywords": [
     "idempotency",

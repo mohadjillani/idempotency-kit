@@ -1,6 +1,6 @@
 {
   "name": "@mohadjillani/idempotency-kit-redis",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Redis store for @mohadjillani/idempotency-kit: atomic acquire in a single Lua script.",
   "keywords": [
     "idempotency",

@@ -1,6 +1,6 @@
 {
   "name": "@mohadjillani/idempotency-kit-mongodb",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MongoDB store for @mohadjillani/idempotency-kit: findOneAndUpdate upsert on the _id index with a TTL index for expiry.",
   "keywords": [
     "idempotency",
